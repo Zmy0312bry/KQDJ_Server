@@ -102,7 +102,7 @@ class UserFormFunctions(APIView):
 class AdminFormFunctions(APIView):
     # 拉起表单(单表单和多表单)
     @method_decorator(
-        auth.token_required(required_permission=[ADMIN_USER, SUPER_ADMIN_USER])
+        auth.token_required(required_permission=[ADMIN_USER, SUPER_ADMIN_USER, PROPERTY_STAFF])
     )
     def get(self, request):
         is_pk = request.GET.get("uuid", None)  # 无pk无finish为历史记录
@@ -140,7 +140,7 @@ class AdminFormFunctions(APIView):
 
     # 处理一个表单
     @method_decorator(
-        auth.token_required(required_permission=[ADMIN_USER, SUPER_ADMIN_USER])
+        auth.token_required(required_permission=[ADMIN_USER, SUPER_ADMIN_USER, PROPERTY_STAFF])
     )
     def put(self, request):
         is_pk = request.GET.get("uuid", None)
@@ -198,7 +198,7 @@ class AdminFormFunctions(APIView):
 class AdminFormHandleFunctions(APIView):
     # 获取待回访表单
     @method_decorator(
-        auth.token_required(required_permission=[ADMIN_USER, SUPER_ADMIN_USER])
+        auth.token_required(required_permission=[ADMIN_USER, SUPER_ADMIN_USER, PROPERTY_STAFF])
     )
     def get(self, request):
         return CustomResponse(self._admin_get_multi_forms, request)
@@ -211,7 +211,7 @@ class AdminFormHandleFunctions(APIView):
 
     # 处理一个表单
     @method_decorator(
-        auth.token_required(required_permission=[ADMIN_USER, SUPER_ADMIN_USER])
+        auth.token_required(required_permission=[ADMIN_USER, SUPER_ADMIN_USER, PROPERTY_STAFF])
     )
     def put(self, request):
         is_pk = request.GET.get("uuid", None)
