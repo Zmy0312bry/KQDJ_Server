@@ -102,7 +102,9 @@ class UserFormFunctions(APIView):
 class AdminFormFunctions(APIView):
     # 拉起表单(单表单和多表单)
     @method_decorator(
-        auth.token_required(required_permission=[ADMIN_USER, SUPER_ADMIN_USER, PROPERTY_STAFF])
+        auth.token_required(
+            required_permission=[ADMIN_USER, SUPER_ADMIN_USER, PROPERTY_STAFF]
+        )
     )
     def get(self, request):
         is_pk = request.GET.get("uuid", None)  # 无pk无finish为历史记录
@@ -140,7 +142,9 @@ class AdminFormFunctions(APIView):
 
     # 处理一个表单
     @method_decorator(
-        auth.token_required(required_permission=[ADMIN_USER, SUPER_ADMIN_USER, PROPERTY_STAFF])
+        auth.token_required(
+            required_permission=[ADMIN_USER, SUPER_ADMIN_USER, PROPERTY_STAFF]
+        )
     )
     def put(self, request):
         is_pk = request.GET.get("uuid", None)
@@ -198,7 +202,9 @@ class AdminFormFunctions(APIView):
 class AdminFormHandleFunctions(APIView):
     # 获取待回访表单
     @method_decorator(
-        auth.token_required(required_permission=[ADMIN_USER, SUPER_ADMIN_USER, PROPERTY_STAFF])
+        auth.token_required(
+            required_permission=[ADMIN_USER, SUPER_ADMIN_USER, PROPERTY_STAFF]
+        )
     )
     def get(self, request):
         return CustomResponse(self._admin_get_multi_forms, request)
@@ -211,7 +217,9 @@ class AdminFormHandleFunctions(APIView):
 
     # 处理一个表单
     @method_decorator(
-        auth.token_required(required_permission=[ADMIN_USER, SUPER_ADMIN_USER, PROPERTY_STAFF])
+        auth.token_required(
+            required_permission=[ADMIN_USER, SUPER_ADMIN_USER, PROPERTY_STAFF]
+        )
     )
     def put(self, request):
         is_pk = request.GET.get("uuid", None)
@@ -367,15 +375,13 @@ class DispatchOrder(APIView):
             raise Exception("表单标题为空，无法派单")
 
         # 获取access_token
+        print(f"[派单流程] 开始派单: openid={openid}, uuidx={uuidx}, title={title}")
         access_token = self._get_access_token()
 
         # 发送订阅消息
         result = self._send_subscribe_message(
             access_token=access_token,
             openid=openid,
-            serial_number=serial_number,
-            category=category,
-            upload_time=upload_time,
             title=title,
         )
 
@@ -389,6 +395,7 @@ class DispatchOrder(APIView):
             dispatch_openid=openid,
         )
 
+        print(f"[派单流程] 派单完成，已创建派单记录")
         return result
 
     def _get_access_token(self):
@@ -399,22 +406,28 @@ class DispatchOrder(APIView):
 
         url = f"https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid={appid}&secret={secret}"
 
+        print(f"[微信接口] 获取access_token请求URL: {url}")
+
         try:
             response = requests.get(url, timeout=10)
+            print(f"[微信接口] 获取access_token响应状态码: {response.status_code}")
+            print(f"[微信接口] 获取access_token响应内容: {response.text}")
+
             response.raise_for_status()
             data = response.json()
 
             if "access_token" not in data:
                 error_msg = data.get("errmsg", "未知错误")
+                print(f"[微信接口] 获取access_token失败: {error_msg}")
                 raise Exception(f"获取access_token失败: {error_msg}")
 
+            print(f"[微信接口] 获取access_token成功")
             return data["access_token"]
         except requests.RequestException as e:
+            print(f"[微信接口] 请求微信接口异常: {str(e)}")
             raise Exception(f"请求微信接口失败: {str(e)}")
 
-    def _send_subscribe_message(
-        self, access_token, openid, serial_number, category, upload_time, title
-    ):
+    def _send_subscribe_message(self, access_token, openid, title):
         """发送订阅消息"""
         url = f"https://api.weixin.qq.com/cgi-bin/message/subscribe/send?access_token={access_token}"
 
@@ -423,53 +436,48 @@ class DispatchOrder(APIView):
         current_time = datetime.now(beijing_tz)
         dispatch_time = current_time.strftime("%Y年%m月%d日 %H:%M")
 
-        # 转换诉求时间
-        request_time = timestamp_to_beijing_str(
-            upload_time, format="%Y年%m月%d日 %H:%M"
-        )
-
-        # 映射 category 值为符合微信订阅消息要求的短语
-        # 微信 phrase 类型字段要求使用预定义词库中的词
-        category_mapping = {
-            "物业纠纷类": "物业纠纷",
-            "公共设施维护类": "公共设施",
-            "环境卫生与秩序类": "环境卫生",
-            "邻里矛盾类": "邻里矛盾",
-        }
-        phrase_value = category_mapping.get(category, "其他") if category else "其他"
-
         # 构建请求体
         message_data = {
-            "template_id": "FVrAJnJauxtOwiEpxOW47zKiSICGIFvaq8iXUaHtY-g",
+            "template_id": "QSW5PvhHb9ENbmhHgQCCEC72XuZoYU-uz7uaHsMkZcQ",
             "touser": openid,
             "data": {
-                "thing1": {
-                    "value": serial_number[:20]  # 微信限制最多20个字符
-                },
-                "phrase2": {"value": phrase_value},
-                "time3": {"value": dispatch_time},
-                "thing5": {
+                "thing2": {
                     "value": title[:20]  # 微信限制最多20个字符
                 },
-                "time8": {"value": request_time},
+                "time3": {"value": dispatch_time},
+                "thing4": {"value": "请迅速处理派单"},
             },
             "miniprogram_state": "formal",
             "lang": "zh_CN",
         }
 
+        print(f"[微信接口] 发送订阅消息请求URL: {url}")
+        print(f"[微信接口] 发送订阅消息请求体: {message_data}")
+
         try:
             response = requests.post(url, json=message_data, timeout=10)
+            print(f"[微信接口] 发送订阅消息响应状态码: {response.status_code}")
+            print(f"[微信接口] 发送订阅消息响应内容: {response.text}")
+
             response.raise_for_status()
             result = response.json()
 
-            if result.get("errcode") == 0:
+            errcode = result.get("errcode")
+            print(f"[微信接口] 错误码: {errcode}")
+
+            if errcode == 0:
+                print(f"[微信接口] 发送订阅消息成功: openid={openid}, title={title}")
                 return {
                     "message": "派单成功",
-                    "serial_number": serial_number,
+                    "title": title,
                     "recipient": openid,
                 }
             else:
                 error_msg = result.get("errmsg", "未知错误")
+                print(
+                    f"[微信接口] 发送订阅消息失败: errcode={errcode}, errmsg={error_msg}"
+                )
                 raise Exception(f"发送订阅消息失败: {error_msg}")
         except requests.RequestException as e:
+            print(f"[微信接口] 请求微信接口异常: {str(e)}")
             raise Exception(f"请求微信接口失败: {str(e)}")
